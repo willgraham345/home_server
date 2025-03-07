@@ -1,0 +1,29 @@
+version: "3.8"
+services:
+  postgres01:
+    image: "11notes/postgres:16"
+    container_name: "postgre01"
+    environment:
+      POSTGRES_PASSWORD: ****************
+      TZ: Europe/Zurich
+    volumes:
+      - "postgre01:/postgres/var"
+    networks:
+      - postgre01
+  postgres02:
+    image: "11notes/postgres:16"
+    container_name: "postgre02"
+    environment:
+      POSTGRES_PASSWORD: ****************
+      TZ: Europe/Zurich
+    volumes:
+      - "postgre02:/postgres/var"
+    networks:
+      - postgre02
+networks:
+  postgre01:
+    driver: bridge
+    internal: true
+  postgre02:
+    driver: bridge
+    internal: true
