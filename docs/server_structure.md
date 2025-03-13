@@ -20,9 +20,6 @@ ubuntu[Ubuntu<br>192.168.50.72]
 haos[Home Assistant<br>192.168.73]
 end
 
-
-
-
 ```
 
 
