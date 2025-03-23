@@ -1,0 +1,10 @@
+tls:
+  certificates:
+    - certFile: /certs/local-cert.pem
+      keyFile: /certs/local-key.pem
+  
+  # Set default TLS options for all domains
+  options:
+    default:
+      minVersion: "VersionTLS12"
+      sniStrict: false  # Important for local networking

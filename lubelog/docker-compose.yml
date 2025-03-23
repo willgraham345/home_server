@@ -3,6 +3,7 @@ version: "3.4"
 
 services:
   app:
+    container_name: lubelogger
     image: ghcr.io/hargata/lubelogger:latest
     build: .
     restart: unless-stopped
@@ -15,7 +16,13 @@ services:
       - 8080:8080
     env_file:
       - .env
+    networks:
+      - nginx-managed
 
 volumes:
   data:
   keys:
+
+networks:
+  nginx-managed:
+    external: true

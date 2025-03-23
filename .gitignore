@@ -1,0 +1,4 @@
+nginx/data/letsencrypt-acme-challenge/*
+nginx/data/custom_ssl/*
+nginx/letsencrypt/*
+nginx/posgres/
