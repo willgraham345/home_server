@@ -1,0 +1,101 @@
+---
+# TODO: Check that this AI answer works
+# roles/traefik/tasks/main.yml
+- name: Ensure required packages are installed
+  ansible.builtin.package:
+    name:
+      - docker
+      - docker-compose
+      - openssl
+      - python3-docker
+    state: present
+  become: true
+
+- name: Ensure Docker service is running
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  become: true
+
+- name: Create Traefik directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ traefik_base_dir }}"
+    - "{{ traefik_base_dir }}/data/traefik/config"
+    - "{{ traefik_base_dir }}/data/traefik/certs"
+  become: true
+
+- name: Create Docker network for Traefik
+  community.docker.docker_network:
+    name: proxy
+    state: present
+  become: true
+
+- name: Create Traefik config file
+  ansible.builtin.template:
+    src: traefik.yml.j2
+    dest: "{{ traefik_base_dir }}/data/traefik/config/traefik.yml"
+    mode: '0644'
+  become: true
+  notify: Restart Traefik
+
+- name: Create Traefik TLS config file
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: "{{ traefik_base_dir }}/data/traefik/config/config.yml"
+    mode: '0644'
+  become: true
+  notify: Restart Traefik
+
+- name: Check if SSL certificates already exist
+  ansible.builtin.stat:
+    path: "{{ traefik_base_dir }}/data/traefik/certs/local-cert.pem"
+  register: ssl_cert
+  become: true
+
+- name: Generate self-signed SSL certificate if it doesn't exist
+  ansible.builtin.command: >
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048
+    -keyout {{ traefik_base_dir }}/data/traefik/certs/local-key.pem
+    -out {{ traefik_base_dir }}/data/traefik/certs/local-cert.pem
+    -subj "/CN=*.local"
+    -addext "subjectAltName = DNS:*.local,DNS:local,DNS:*.home,DNS:home,DNS:*.lan,DNS:lan"
+  become: true
+  when: not ssl_cert.stat.exists
+  notify: Restart Traefik
+
+- name: Set proper permissions on SSL files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: '0600'
+  loop:
+    - "{{ traefik_base_dir }}/data/traefik/certs/local-key.pem"
+    - "{{ traefik_base_dir }}/data/traefik/certs/local-cert.pem"
+  become: true
+  when: not ssl_cert.stat.exists
+
+- name: Create docker-compose.yml for Traefik
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ traefik_base_dir }}/docker-compose.yml"
+    mode: '0644'
+  become: true
+  notify: Restart Traefik
+
+- name: Create Traefik environment file
+  ansible.builtin.template:
+    src: traefik.env.j2
+    dest: "{{ traefik_base_dir }}/.env"
+    mode: '0600'
+  become: true
+  notify: Restart Traefik
+
+- name: Start Traefik container with docker-compose
+  community.docker.docker_compose:
+    project_src: "{{ traefik_base_dir }}"
+    state: present
+  become: true

@@ -1,0 +1,61 @@
+---
+- name: Install Docker and create proxy network
+  hosts: all
+  become: true
+  tasks:
+    - name: Check if Docker is installed
+      command: which docker
+      register: docker_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Install required packages for Docker
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+        update_cache: yes
+      when: docker_check.rc != 0
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      when: docker_check.rc != 0
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      when: docker_check.rc != 0
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+        update_cache: yes
+      when: docker_check.rc != 0
+
+    - name: Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+      when: docker_check.rc != 0
+
+    - name: Check if Docker network "proxy" exists
+      command: docker network inspect proxy
+      register: network_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Create Docker network "proxy"
+      command: docker network create proxy
+      when: network_check.rc != 0
