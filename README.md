@@ -11,8 +11,7 @@
 
 
 Docker compose setps
-- Create nginx-managed
-- Launch nginx-proxy-manager
+- Set up traefik
 - Launch lubelogger
 - Launch outline
 - Launch portainer

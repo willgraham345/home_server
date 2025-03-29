@@ -1,6 +1,13 @@
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
 api:
   dashboard: true
-  insecure: true  # Enabled for easier local access (no auth required)
+  insecure: true # Enabled for easier local access (no auth required)
+
+log:
+  level: DEBUG
 
 entryPoints:
   web:
@@ -12,8 +19,8 @@ entryPoints:
 providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
-    exposedByDefault: false
     network: proxy
+    # exposedByDefault: false
   file:
     filename: /config.yml
 

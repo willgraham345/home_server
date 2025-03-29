@@ -1,22 +1,23 @@
-version: '3'
+version: "3"
 
 services:
-  traefik:
-    image: traefik:v2.10
+  reverse-proxy:
+    image: traefik:v3.3.4
     container_name: traefik
     restart: unless-stopped
+    command: --api.insecure=true --providers.docker
     security_opt:
       - no-new-privileges:true
     networks:
       - proxy
     ports:
-      - "80:80"     # HTTP
-      - "443:443"   # HTTPS
-      - "8080:8080" # Traefik Dashboard (easily accessible on local network)
+      - "80:80" # HTTP
+      - "443:443" # HTTPS
+      - "8080:8080" # Traefik Dashboard web UI (easily accessible on local network)
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./data/traefik/config/traefik.yml:/traefik.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Mounts docker socket to the volume
+      - ./data/traefik/config/traefik.yml:/etc/traefik.yml:ro # Mounting configurations to traefik
       - ./data/traefik/config/config.yml:/config.yml:ro
       - ./data/traefik/certs:/certs:ro
     labels:
