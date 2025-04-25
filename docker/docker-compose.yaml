@@ -1,0 +1,56 @@
+---
+version: "3.4"
+
+services:
+  reverse-proxy:
+    # The official v3 Traefik docker image
+    image: traefik:v3.3
+    # Enables the web UI and tells Traefik to listen to docker
+    command: --api.insecure=true --providers.docker
+    ports:
+      # The HTTP port
+      - "80:80"
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
+  app:
+    container_name: lubelogger
+    image: ghcr.io/hargata/lubelogger:latest #TODO: change to version
+    build: .
+    restart: unless-stopped
+    # volumes used to keep data persistent
+    volumes:
+      - data:/App/data
+      - keys:/root/.aspnet/DataProtection-Keys
+    # expose port and/or use serving via traefik
+    ports:
+      - 5000:8080
+    env_file:
+      - .env
+    # traefik configurations, including networks can be commented out if not needed
+    networks:
+      - proxy
+    labels:
+      ## Traefik General
+      # We set 'enable by default' to false, so this tells Traefik we want it to connect here
+      traefik.enable: true
+      # define network for traefik<>app communication
+      traefik.docker.network: proxy
+      ## HTTP Routers
+      traefik.http.routers.whoami.entrypoints: https
+      traefik.http.routers.whoami.rule: Host(`cars.grahamFam`)
+      ## Middlewares
+      #traefik.http.routers.whoami.middlewares: authentik@docker
+      # none
+      ## HTTP Services
+      traefik.http.services.whoami.loadbalancer.server.port: 5000
+
+volumes:
+  data:
+  keys:
+
+networks:
+  proxy:
+    external: true
