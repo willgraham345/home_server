@@ -161,3 +161,7 @@ services:
 networks:
   web:
     external: true
+# TODO: Create and populate host directories
+# sudo mkdir -p /opt/docker/{caddy,lubelogger,nextcloud,outline,vikunja}
+# sudo chown -R $(whoami): /opt/docker)
+# TODO: Create web network: "docker network create web"
