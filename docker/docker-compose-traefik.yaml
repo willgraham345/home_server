@@ -1,6 +1,8 @@
 ---
 version: "3.4"
 
+MNT_DIR=/opt/docker
+
 services:
   reverse-proxy:
     # The official v3 Traefik docker image
@@ -28,7 +30,7 @@ services:
     ports:
       - 5000:8080
     env_file:
-      - .env
+      - lubelog/.env
     # traefik configurations, including networks can be commented out if not needed
     networks:
       - proxy
