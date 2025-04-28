@@ -1,0 +1,28 @@
+{
+  # Global options block
+  # Use your email for ACME notifications
+  email   ${EMAIL}
+  # Uncomment & configure below if you need a DNS provider
+  # acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+
+# LubeLogger
+lubelogger.${DOMAIN_BASE} {
+  reverse_proxy lubelogger:8080
+}
+
+# Nextcloud
+nextcloud.${DOMAIN_BASE} {
+  reverse_proxy nextcloud:80
+}
+
+# Outline
+wiki.${DOMAIN_BASE} {
+  reverse_proxy outline:3000
+}
+
+# Vikunja
+todo.${DOMAIN_BASE} {
+  reverse_proxy vikunja:3456
+}
+

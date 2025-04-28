@@ -1,0 +1,163 @@
+version: "3.8"
+
+services:
+  ##################################
+  #       C A D D Y   R P          #
+  ##################################
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Caddyfile with your routing rules
+      - /opt/docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # where Caddy stores certs, logs, etc.
+      - /opt/docker/caddy/data:/data
+      # Caddy config (JSON store) if needed
+      - /opt/docker/caddy/config:/config
+      # allow Caddy to see container hostnames/networks
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - web
+    restart: unless-stopped
+    environment:
+      # optional: to override CA or ACME behavior
+      - ACME_AGREE=true
+
+  ##################################
+  #         L U B E L O G G E R     #
+  ##################################
+
+  lubelogger:
+    image: ghcr.io/hargata/lubelogger:latest
+    container_name: lubelogger
+    env_file:
+      - /opt/docker/lubelogger/.env
+    volumes:
+      - /opt/docker/lubelogger/config:/App/config
+      - /opt/docker/lubelogger/data:/App/data
+      - /opt/docker/lubelogger/documents:/App/wwwroot/documents
+      - /opt/docker/lubelogger/images:/App/wwwroot/images
+      - /opt/docker/lubelogger/keys:/root/.aspnet/DataProtection-Keys
+      - /opt/docker/lubelogger/log:/App/log
+      - /opt/docker/lubelogger/temp:/App/temp
+    networks:
+      - web
+    restart: unless-stopped
+
+  ##################################
+  #          N E X T C L O U D      #
+  ##################################
+
+  nextcloud-db:
+    image: mariadb:10.5
+    container_name: nextcloud-db
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    environment:
+      - MYSQL_ROOT_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+    volumes:
+      - /opt/docker/nextcloud/db:/var/lib/mysql
+    networks:
+      - web
+    restart: unless-stopped
+
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    depends_on: [nextcloud-db]
+    environment:
+      - MYSQL_HOST=nextcloud-db
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+    volumes:
+      - /opt/docker/nextcloud/html:/var/www/html
+      - /opt/docker/nextcloud/data:/var/www/html/data
+    networks:
+      - web
+    restart: unless-stopped
+
+  ##################################
+  #            O U T L I N E       #
+  ##################################
+
+  outline-redis:
+    image: redis:alpine
+    container_name: outline-redis
+    volumes:
+      - /opt/docker/outline/redis:/data
+    networks:
+      - web
+    restart: unless-stopped
+
+  outline-db:
+    image: postgres:13-alpine
+    container_name: outline-db
+    environment:
+      - POSTGRES_DB=outline
+      - POSTGRES_USER=${OUTLINE_DB_USER}
+      - POSTGRES_PASSWORD=${OUTLINE_DB_PASSWORD}
+    volumes:
+      - /opt/docker/outline/postgres:/var/lib/postgresql/data
+    networks:
+      - web
+    restart: unless-stopped
+
+  outline:
+    image: outlinewiki/outline:latest
+    container_name: outline
+    depends_on: [outline-redis, outline-db]
+    env_file:
+      - /opt/docker/outline/.env
+    volumes:
+      - /opt/docker/outline/storage:/var/lib/outline/data
+    networks:
+      - web
+    restart: unless-stopped
+
+  ##################################
+  #            V I K U N J A       #
+  ##################################
+
+  vikunja-db:
+    image: mariadb:10.5
+    container_name: vikunja-db
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      - MYSQL_ROOT_PASSWORD=${VIKUNJA_DB_PASSWORD}
+      - MYSQL_DATABASE=vikunja
+      - MYSQL_USER=${VIKUNJA_DB_USER}
+      - MYSQL_PASSWORD=${VIKUNJA_DB_PASSWORD}
+    volumes:
+      - /opt/docker/vikunja/db:/var/lib/mysql
+    networks:
+      - web
+    restart: unless-stopped
+
+  vikunja:
+    image: vikunja/vikunja:latest
+    container_name: vikunja
+    depends_on: [vikunja-db]
+    environment:
+      - VIKUNJA_SERVICE_PUBLICURL=https://${VIKUNJA_DOMAIN}/
+      - VIKUNJA_DATABASE_HOST=vikunja-db
+      - VIKUNJA_DATABASE_TYPE=mysql
+      - VIKUNJA_DATABASE_USER=${VIKUNJA_DB_USER}
+      - VIKUNJA_DATABASE_PASSWORD=${VIKUNJA_DB_PASSWORD}
+      - VIKUNJA_DATABASE_DATABASE=vikunja
+      - VIKUNJA_SERVICE_JWTSECRET=${VIKUNJA_JWTSECRET}
+    volumes:
+      - /opt/docker/vikunja/files:/app/vikunja/files
+    networks:
+      - web
+    restart: unless-stopped
+
+networks:
+  web:
+    external: true
