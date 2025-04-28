@@ -1,0 +1,264 @@
+version: "3.8"
+
+###########################
+# Note: create a .env file here with:
+#
+# # Tailscale
+# TS_AUTHKEY=tskey-xxx
+# TRAEFIK_HOSTNAME=traefik
+#
+# # Plane
+# PLANE_DB_PASSWORD=…
+# PLANE_SECRET_KEY_BASE=…        # generate via `openssl rand -hex 64`
+# PLANE_DOMAIN=plane.example.com
+#
+# # LubeLogger
+# # (no extra secrets; config goes in env_file for lubelogger below)
+#
+# # Nextcloud
+# NEXTCLOUD_DB_PASSWORD=…
+# NEXTCLOUD_DOMAIN=nextcloud.example.com
+#
+# # OpenProject
+# OPENPROJECT_DB_PASSWORD=…
+# OPENPROJECT_SECRET_KEY_BASE=…   # generate via `openssl rand -hex 64`
+# OPENPROJECT_DOMAIN=openproject.example.com
+#
+# # Outline
+# OUTLINE_DB_USER=outline
+# OUTLINE_DB_PASSWORD=…
+# OUTLINE_DOMAIN=wiki.example.com
+# (plus the rest of Outline’s env in ./outline/.env — see docs)
+###########################
+
+services:
+  ##───────────────────────────────────────────##
+  ## T A I L S C A L E   N E T W O R K I N G ##
+  ##───────────────────────────────────────────##
+
+  # runs the tailscaled daemon, storing state to a bind-mounted volume
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: tailscale
+    privileged: true
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+    command: tailscaled
+    restart: unless-stopped
+
+  # brings up the Tailscale interface and authenticates
+  tailscale-up:
+    image: tailscale/tailscale:stable
+    container_name: tailscale-up
+    depends_on: [tailscale]
+    network_mode: "service:tailscale"
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_HOSTNAME=${TRAEFIK_HOSTNAME}
+    entrypoint:
+      - tailscale
+      - up
+      - "--authkey=${TS_AUTHKEY}"
+      - "--hostname=${TRAEFIK_HOSTNAME}"
+      - "--accept-routes"
+    restart: unless-stopped
+
+  ##───────────────────────────────────────────##
+  ##     T R A E F I K   (R E V E R S E      ##
+  ##             P R O X Y)                  ##
+  ##───────────────────────────────────────────##
+
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    depends_on: [tailscale-up]
+    # share the Tailscale IP/stack so Traefik listens on it directly
+    network_mode: "service:tailscale"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/acme.json:/acme.json
+    restart: unless-stopped
+    labels:
+      # enable the Traefik API/dashboard at https://<your-tailscale-IP>/
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`${TRAEFIK_HOSTNAME}`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls=true"
+
+  ##───────────────────────────────────────────##
+  ##                P L A N E                ##
+  ##───────────────────────────────────────────##
+
+  plane-db:
+    image: postgres:15-alpine
+    container_name: plane-db
+    environment:
+      - POSTGRES_USER=plane
+      - POSTGRES_PASSWORD=${PLANE_DB_PASSWORD}
+      - POSTGRES_DB=plane
+    volumes:
+      - ./plane/db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  plane-redis:
+    image: redis:alpine
+    container_name: plane-redis
+    volumes:
+      - ./plane/redis:/data
+    restart: unless-stopped
+
+  plane:
+    image: makeplane/plane:latest
+    container_name: plane
+    depends_on: [plane-db, plane-redis]
+    environment:
+      - DATABASE_URL=postgres://plane:${PLANE_DB_PASSWORD}@plane-db:5432/plane
+      - REDIS_URL=redis://plane-redis:6379/0
+      - SECRET_KEY_BASE=${PLANE_SECRET_KEY_BASE}
+    volumes:
+      - ./plane/storage:/storage
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.plane.rule=Host(`${PLANE_DOMAIN}`)"
+      - "traefik.http.routers.plane.entrypoints=websecure"
+      - "traefik.http.routers.plane.tls=true"
+      - "traefik.http.services.plane.loadbalancer.server.port=80"
+
+  ##───────────────────────────────────────────##
+  ##             L U B E L O G G E R           ##
+  ##───────────────────────────────────────────##
+
+  lubelogger:
+    image: ghcr.io/hargata/lubelogger:latest
+    container_name: lubelogger
+    env_file: ./lubelogger/.env   # generate via the Configurator at https://lubelogger.com/configure  [oai_citation:0‡Home - LubeLogger Wiki](https://docs.lubelogger.com/Installation/Getting%20Started?utm_source=chatgpt.com)
+    # TODO: Change location for config/data
+    volumes:
+      - ./lubelogger/config:/App/config
+      - ./lubelogger/data:/App/data
+      - ./lubelogger/documents:/App/wwwroot/documents
+      - ./lubelogger/images:/App/wwwroot/images
+      - ./lubelogger/keys:/App/keys
+      - ./lubelogger/log:/App/log
+      - ./lubelogger/temp:/App/temp
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lubelogger.rule=Host(`lubelogger.${PLANE_DOMAIN%%.*}`)"
+      - "traefik.http.routers.lubelogger.entrypoints=websecure"
+      - "traefik.http.routers.lubelogger.tls=true"
+      - "traefik.http.services.lubelogger.loadbalancer.server.port=8080"
+
+  ##───────────────────────────────────────────##
+  ##             N E X T C L O U D            ##
+  ##───────────────────────────────────────────##
+
+  nextcloud-db:
+    image: mariadb:10.5
+    container_name: nextcloud-db
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    environment:
+      - MYSQL_ROOT_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+    volumes:
+      - ./nextcloud/db:/var/lib/mysql
+    restart: unless-stopped
+
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    depends_on: [nextcloud-db]
+    environment:
+      - MYSQL_HOST=nextcloud-db
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+    volumes:
+      - ./nextcloud/html:/var/www/html
+      - ./nextcloud/data:/var/www/html/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nextcloud.rule=Host(`${NEXTCLOUD_DOMAIN}`)"
+      - "traefik.http.routers.nextcloud.entrypoints=websecure"
+      - "traefik.http.routers.nextcloud.tls=true"
+      - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+
+  ##───────────────────────────────────────────##
+  ##            O P E N P R O J E C T         ##
+  ##───────────────────────────────────────────##
+
+  openproject-db:
+    image: postgres:14-alpine
+    container_name: openproject-db
+    environment:
+      - POSTGRES_DB=openproject
+      - POSTGRES_USER=openproject
+      - POSTGRES_PASSWORD=${OPENPROJECT_DB_PASSWORD}
+    volumes:
+      - ./openproject/db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  openproject:
+    image: openproject/community:15
+    container_name: openproject
+    depends_on: [openproject-db]
+    environment:
+      - DATABASE_URL=postgres://openproject:${OPENPROJECT_DB_PASSWORD}@openproject-db:5432/openproject
+      - SECRET_KEY_BASE=${OPENPROJECT_SECRET_KEY_BASE}
+      - OPENPROJECT_HTTPS=false
+    volumes:
+      - ./openproject/assets:/var/openproject/assets
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openproject.rule=Host(`${OPENPROJECT_DOMAIN}`)"
+      - "traefik.http.routers.openproject.entrypoints=websecure"
+      - "traefik.http.routers.openproject.tls=true"
+      - "traefik.http.services.openproject.loadbalancer.server.port=8080"  [oai_citation:1‡OpenProject.org](https://www.openproject.org/docs/installation-and-operations/installation/docker-compose/?utm_source=chatgpt.com)
+
+  ##───────────────────────────────────────────##
+  ##              O U T L I N E                ##
+  ##───────────────────────────────────────────##
+
+  outline-redis:
+    image: redis:alpine
+    container_name: outline-redis
+    volumes:
+      - ./outline/redis:/data
+    restart: unless-stopped
+
+  outline-db:
+    image: postgres:13-alpine
+    container_name: outline-db
+    environment:
+      - POSTGRES_DB=outline
+      - POSTGRES_USER=${OUTLINE_DB_USER}
+      - POSTGRES_PASSWORD=${OUTLINE_DB_PASSWORD}
+    volumes:
+      - ./outline/postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  outline:
+    image: outlinewiki/outline:latest
+    container_name: outline
+    depends_on: [outline-redis, outline-db]
+    env_file: ./outline/.env        # see: https://docs.getoutline.com/s/hosting/doc/docker-7pfeLP5a8t  [oai_citation:2‡Bit Doze Website](https://www.bitdoze.com/outline-install/?utm_source=chatgpt.com)
+    volumes:
+      - ./outline/storage:/var/lib/outline/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.outline.rule=Host(`${OUTLINE_DOMAIN}`)"
+      - "traefik.http.routers.outline.entrypoints=websecure"
+      - "traefik.http.routers.outline.tls=true"
+      - "traefik.http.services.outline.loadbalancer.server.port=3000"
+
+volumes:
+  tailscale-state:
+  # ... no named volumes for apps; all data is bind-mounted under ./<service>/**
