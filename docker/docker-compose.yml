@@ -165,3 +165,7 @@ networks:
 # sudo mkdir -p /opt/docker/{caddy,lubelogger,nextcloud,outline,vikunja}
 # sudo chown -R $(whoami): /opt/docker)
 # TODO: Create web network: "docker network create web"
+# TODO: Add DNS pointing to right locations nextcloud.${DOMAIN_BASE}
+# wiki.${DOMAIN_BASE}
+# todo.${DOMAIN_BASE}
+# lubelogger.${DOMAIN_BASE}
