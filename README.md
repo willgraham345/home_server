@@ -1,4 +1,5 @@
 # Server setup guide
+
 - TODO: Set up an ansible script for initial setup
   - Install docker
   - Set up Dotfiles
@@ -9,8 +10,8 @@
 - TODO: Set up an ansible script for self-host repo clone...?
   - Set up gitignore
 
-
 Docker compose setps
+
 - Set up traefik
 - Launch lubelogger
 - Launch outline
@@ -19,7 +20,7 @@ Docker compose setps
 - Launch openproject
 
 ```mermaid
-graph 
+graph
   router[Router<br>198.162.50.1]
 
 nginx[Nginx<br>192.168.50.]
@@ -40,7 +41,6 @@ haos[Home Assistant<br>192.168.73]
 end
 
 ```
-
 
 ```mermaid
 ---
