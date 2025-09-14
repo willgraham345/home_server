@@ -1,4 +1,5 @@
 # Server setup guide
+
 - TODO: Set up an ansible script for initial setup
   - Install docker
   - Set up Dotfiles
@@ -9,8 +10,8 @@
 - TODO: Set up an ansible script for self-host repo clone...?
   - Set up gitignore
 
-
 Docker compose setps
+
 - Create nginx-managed
 - Launch nginx-proxy-manager
 - Launch lubelogger
@@ -18,3 +19,4 @@ Docker compose setps
 - Launch portainer
 - Launch dashy
 - Launch openproject
+- Launch home assistant

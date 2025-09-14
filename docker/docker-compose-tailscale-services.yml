@@ -2,7 +2,7 @@
 version: "3.7"
 services:
 tailscale-nginx:
-  image: tailscale/tailscale:latest
+  image: tailscale/tailscale:v1.58
   hostname: tailscale_nginx
   environment:
     - TS_AUTHKEY=tskey-client-notAReal-OAuthClientSecret1Atawk
@@ -37,6 +37,8 @@ tailscale-nginx:
     image: ghcr.io/hargata/lubelogger:latest #TODO: Change to version
     # build: . #TODO: Change this to build it somewhere else, preferrably where the container is stored
     restart: unless-stopped
+    depends_on:
+      - tailscale-nginx
     volumes: 
     - data:/App/data
     - keys:/root/.aspnet/DataProtection-Keys

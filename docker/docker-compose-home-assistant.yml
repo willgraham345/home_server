@@ -1,0 +1,53 @@
+services:
+# finish reading https://pimylifeup.com/home-assistant-docker-compose/
+  homeassistant:
+    container_name: homeassistant
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    volumes:
+      - ./haos/config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+
+  #TODO: Research this container. Not sure what it does.
+  nodered:
+    container_name: nodered
+    image: nodered/node-red
+    environment:
+      - TZ=<TIMEZONE>
+    ports:
+      - 1880:1880
+    volumes:
+      - ./nodered:/data
+    depends_on:
+      - homeassistant
+      - mosquitto
+    restart: unless-stopped
+  #TODO: Research this container too
+  mosquitto:
+    container_name: mosquitto
+    image: eclipse-mosquitto
+    environment:
+      - TZ=<TIMEZONE>
+    ports:
+      - 1883:1883
+      - 9001:9001
+    volumes:
+      - "./mosquitto/config:/mosquitto/config"
+      - "./mosquitto/data:/mosquitto/data"
+      - "./mosquitto/log:/mosquitto/log"
+    restart: unless-stopped
+  # TODO: Research this contiainer
+  code-server:
+    container_name: code_server
+    image: lscr.io/linuxserver/code-server:latest
+    environment:
+      - TZ=<TIMEZONE>
+      - DEFAULT_WORKSPACE=/config
+    ports:
+      - 8443:8443
+    volumes:
+      - ./hass-config:/config
+    restart: unless-stopped
