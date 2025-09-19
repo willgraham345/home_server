@@ -1,6 +1,0 @@
----
-- name: Main playbook for Docker setup
-  hosts: all
-  become: true
-  roles:
-    - role: docker-setup

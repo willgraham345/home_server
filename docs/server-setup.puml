@@ -1,0 +1,13 @@
+@startuml
+package ansible {
+  object "main.yml" as main
+}
+package docker {
+  package todo {
+    object portainer
+    object solidtime
+  }
+  object lubelogger
+
+}
+@enduml
